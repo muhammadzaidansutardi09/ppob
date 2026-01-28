@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
   Smartphone, Zap, Wifi, Gamepad2, CreditCard, 
   Wallet, ShieldPlus, MoreHorizontal, Bell, 
   Plus, History, User, Home as HomeIcon, ScanLine, ArrowUpRight,
-  Eye, EyeOff, LogIn, LogOut
+  Eye, EyeOff, LogOut, X, CheckCircle2, Clock, AlertCircle, ShoppingBag
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,29 +13,63 @@ import { useRouter } from 'next/navigation';
 export default function HomePage() {
   const router = useRouter();
   
-  // State User (Diambil dari LocalStorage)
+  // === STATE USER ===
   const [user, setUser] = useState<any>({ name: 'Loading...', saldo: 0 });
   const [loading, setLoading] = useState(true);
   
-  // State Toggle Saldo
+  // === STATE NOTIFIKASI ===
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null); // Untuk klik di luar dropdown
+
+  // === STATE TOGGLE SALDO ===
   const [showSaldo, setShowSaldo] = useState(true);
 
-  // === 1. CEK SESSION SAAT LOAD ===
+  // === 1. LOAD DATA & NOTIFIKASI ===
   useEffect(() => {
-    // Ambil data user yang sedang login
+    // A. Cek Session User
     const session = localStorage.getItem('ppob_session');
-    
     if (!session) {
-      // Kalau gak ada session, tendang ke Login
       router.push('/login'); 
     } else {
-      // Kalau ada, simpan ke state biar muncul di layar
       setUser(JSON.parse(session));
       setLoading(false);
     }
+
+    // B. Load Notifikasi dari Riwayat
+    const riwayat = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
+    setNotifications(riwayat);
+
+    // Hitung berapa yang belum dibaca (is_read === undefined atau false)
+    const unread = riwayat.filter((item: any) => !item.is_read).length;
+    setUnreadCount(unread);
+
+    // Event Listener untuk klik di luar dropdown (biar nutup sendiri)
+    function handleClickOutside(event: any) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // === 2. FUNGSI LOGOUT ===
+  // === 2. HANDLE BUKA NOTIFIKASI (MARK AS READ) ===
+  const toggleNotif = () => {
+    if (!showNotifDropdown) {
+      // Jika mau dibuka: Tandai semua sudah dibaca
+      const updatedNotif = notifications.map(n => ({ ...n, is_read: true }));
+      setNotifications(updatedNotif);
+      setUnreadCount(0); // Reset badge jadi 0
+      
+      // Simpan status "sudah dibaca" ke LocalStorage
+      localStorage.setItem('riwayat_transaksi', JSON.stringify(updatedNotif));
+    }
+    setShowNotifDropdown(!showNotifDropdown);
+  };
+
+  // === 3. FUNGSI LOGOUT ===
   const handleLogout = () => {
     if (confirm("Yakin ingin keluar akun?")) {
       localStorage.removeItem('ppob_session');
@@ -54,7 +88,7 @@ export default function HomePage() {
     { name: 'Lainnya', icon: MoreHorizontal, color: 'bg-gray-50 text-gray-600' },
   ];
 
-  if (loading) return null; // Atau tampilkan spinner loading simple
+  if (loading) return null;
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
@@ -69,16 +103,77 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 font-medium">Selamat Datang,</p>
-              {/* Nama User Dinamis */}
               <h1 className="text-gray-800 font-bold text-lg leading-tight capitalize">
                 {user.name}
               </h1>
             </div>
           </div>
-          <button className="relative p-2 rounded-full hover:bg-gray-50 transition">
-            <Bell size={24} className="text-gray-700" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-          </button>
+
+          {/* === BUTTON NOTIFIKASI DENGAN DROPDOWN === */}
+          <div className="relative" ref={notifRef}>
+            <button 
+              onClick={toggleNotif}
+              className={`relative p-2 rounded-full transition ${showNotifDropdown ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-gray-700'}`}
+            >
+              <Bell size={24} />
+              {/* Badge Merah (Hanya muncul jika unreadCount > 0) */}
+              {unreadCount > 0 && (
+                <div className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full border-2 border-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </button>
+
+            {/* === DROPDOWN PANEL NOTIFIKASI === */}
+            {showNotifDropdown && (
+              <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                  <h3 className="font-bold text-gray-800 text-sm">Notifikasi</h3>
+                  <button onClick={() => setShowNotifDropdown(false)} className="text-gray-400 hover:text-gray-600">
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                <div className="max-h-[300px] overflow-y-auto p-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-200">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                      <ShoppingBag size={32} className="mb-2 opacity-50" />
+                      <p className="text-xs">Belum ada notifikasi</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 10).map((item, i) => ( // Tampilkan max 10 terakhir
+                      <div key={i} className="p-3 rounded-xl hover:bg-gray-50 transition border border-gray-50 flex gap-3 items-start">
+                        {/* Icon Status */}
+                        <div className={`mt-0.5 p-1.5 rounded-full shrink-0
+                          ${item.status === 'Sukses' ? 'bg-green-100 text-green-600' : 
+                            item.status === 'Gagal' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                           {item.status === 'Sukses' ? <CheckCircle2 size={12} /> : 
+                            item.status === 'Gagal' ? <AlertCircle size={12} /> : <Clock size={12} />}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">
+                            Transaksi {item.status}
+                          </p>
+                          <p className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                            {item.product_name} • Rp {item.price.toLocaleString('id-ID')}
+                          </p>
+                          <p className="text-[9px] text-gray-400 mt-1 text-right">
+                            {item.date}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {notifications.length > 0 && (
+                    <Link href="/riwayat" className="block text-center text-[10px] font-bold text-blue-600 py-2 hover:underline">
+                      Lihat Semua Riwayat
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* === CARD SALDO (Biru) === */}
@@ -93,13 +188,11 @@ export default function HomePage() {
                 <div>
                    <div className="flex items-center gap-2 mb-1">
                       <p className="text-blue-100 text-[10px] font-bold tracking-widest uppercase">Total Saldo</p>
-                      {/* Tombol Intip Saldo */}
                       <button onClick={() => setShowSaldo(!showSaldo)} className="text-blue-200 hover:text-white transition">
                         {showSaldo ? <Eye size={14} /> : <EyeOff size={14} />}
                       </button>
                    </div>
                    
-                   {/* Nominal Saldo Dinamis */}
                    <h2 className="text-3xl font-extrabold tracking-tight">
                      {showSaldo ? `Rp ${user.saldo?.toLocaleString('id-ID')}` : "Rp •••••••"}
                    </h2>
@@ -108,13 +201,11 @@ export default function HomePage() {
               </div>
 
               <div className="flex gap-3 mt-auto">
-                {/* Tombol Top Up -> Ke Halaman Topup */}
                 <Link href="/topup" className="flex-1">
                     <button className="w-full bg-white/20 backdrop-blur-sm border border-white/20 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold active:scale-95 transition hover:bg-white/30">
                     <Plus size={16} strokeWidth={3} /> Top Up
                     </button>
                 </Link>
-                {/* Tombol Riwayat -> Ke Halaman Riwayat */}
                 <Link href="/riwayat" className="flex-1">
                     <button className="w-full bg-white/20 backdrop-blur-sm border border-white/20 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold active:scale-95 transition hover:bg-white/30">
                     <History size={16} strokeWidth={3} /> Riwayat
@@ -131,7 +222,6 @@ export default function HomePage() {
             {menus.map((menu, i) => (
               <Link 
                 key={i} 
-                // Hanya menu Pulsa yang aktif, lainnya alert
                 href={menu.name === 'Pulsa' ? '/pulsa' : '#'}
                 className="flex flex-col items-center group w-full active:scale-95 transition-transform"
                 onClick={() => {
@@ -203,7 +293,6 @@ export default function HomePage() {
                <NavButton icon={Wallet} label="Dompet" />
             </Link>
 
-            {/* Tombol Logout */}
             <button onClick={handleLogout} className="w-12 flex flex-col items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors mt-2">
                <LogOut size={24} strokeWidth={2} />
                <span className="text-[10px] font-medium">Keluar</span>
