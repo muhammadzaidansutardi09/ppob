@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma'; // Wajib import ini
 import Midtrans from 'midtrans-client';
 
-// KONFIGURASI MIDTRANS
-// Pastikan Client Key & Server Key sesuai dashboard Midtrans Anda
+// Setup Midtrans
 const snap = new Midtrans.Snap({
   isProduction: false,
-  serverKey: 'SB-Mid-server-UXjtA4DxG241QAOX5xQJsZIY',
+  serverKey: 'SB-Mid-server-UXjtA4DxG241QAOX5xQJsZIY', // Ganti dengan Env jika sudah siap
   clientKey: 'SB-Mid-client-0EocBOEFNi15it07'
 });
 
@@ -15,31 +14,36 @@ export async function POST(req: Request) {
     const { sku_code, product_name, customer_no, amount } = await req.json();
 
     // 1. Buat Order ID Unik
-    // Format: TRX-TIMESTAMP-RANDOM
     const orderId = `TRX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // === BAGIAN DATABASE (ANTI CRASH) ===
-    // Kita bungkus ini biar kalau tabel belum ada, App TIDAK ERROR 500
+    console.log("Mulai Transaksi:", orderId);
+
+    // 2. SIMPAN KE DATABASE (BAGIAN INI YANG KEMARIN MATI, SEKARANG HIDUP)
     try {
       await prisma.transaction.create({
         data: {
+          id: crypto.randomUUID(), // Generate ID manual biar aman
           order_id: orderId,
           customer_no: customer_no,
           sku_code: sku_code,
           product_name: product_name,
-          price_cost: amount - 2500, // Estimasi modal
           price_sell: amount,
+          price_cost: amount - 2500, // Estimasi untung
           payment_status: 'PENDING',
-          delivery_status: 'WAITING'
+          delivery_status: 'WAITING',
+          updated_at: new Date() // Isi manual biar tidak error
         }
       });
-      console.log("✅ Database: Transaksi tersimpan.");
+      console.log("✅ Berhasil simpan ke Supabase");
     } catch (dbError) {
-      // Kalau error (misal tabel belum ada), kita LOG saja, jangan stop prosesnya
-      console.error("⚠️ Database Error (Diabaikan agar user bisa tetap bayar):", dbError);
+      console.error("❌ Gagal simpan ke Database:", dbError);
+      // Kita throw error agar ketahuan kalau database bermasalah
+      // return NextResponse.json({ error: "Database Error" }, { status: 500 });
+      
+      // ATAU: Tetap lanjut ke Midtrans meski DB gagal (Opsional, tapi berisiko data hilang)
     }
 
-    // === BAGIAN MIDTRANS (WAJIB JALAN) ===
+    // 3. Request ke Midtrans
     const parameter = {
       transaction_details: {
         order_id: orderId,
@@ -54,20 +58,19 @@ export async function POST(req: Request) {
         id: sku_code,
         price: amount,
         quantity: 1,
-        name: product_name ? product_name.substring(0, 50) : "Produk"
+        name: product_name ? product_name.substring(0, 50) : "Produk Digital"
       }]
     };
 
-    const midtransToken = await snap.createTransaction(parameter);
+    const transaction = await snap.createTransaction(parameter);
 
-    // Kembalikan token ke frontend
     return NextResponse.json({ 
-      token: midtransToken.token,
+      token: transaction.token,
       order_id: orderId 
     });
 
   } catch (error) {
-    console.error("❌ Critical Error:", error);
+    console.error("Critical Error:", error);
     return NextResponse.json({ error: "Gagal memproses transaksi" }, { status: 500 });
   }
 }
