@@ -13,7 +13,10 @@ function CheckoutContent() {
   const price = parseInt(searchParams.get('price') || '0');
   const sku = searchParams.get('sku');
   const phone = searchParams.get('phone');
-  const old_id = searchParams.get('old_id'); // <--- TANGKAP ID LAMA DI SINI
+  const old_id = searchParams.get('old_id');
+
+  // Deteksi apakah ini transaksi Top Up?
+  const isTopUp = sku === 'TOPUP' || product_name.toLowerCase().includes('isi saldo');
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'saldo' | 'midtrans'>('saldo');
@@ -22,11 +25,16 @@ function CheckoutContent() {
   useEffect(() => {
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
     setUserSaldo(session.saldo || 0);
-  }, []);
+
+    // === LOGIKA BARU: JIKA TOPUP, PAKSA KE MIDTRANS ===
+    if (isTopUp) {
+        setPaymentMethod('midtrans');
+    }
+  }, [isTopUp]);
 
   // Helper Tambah Saldo
   const handleTopUpSuccess = (amount: number) => {
-    if (sku === 'TOPUP' || product_name.toLowerCase().includes('isi saldo')) {
+    if (isTopUp) {
         const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
         const newBalance = (session.saldo || 0) + amount;
 
@@ -42,7 +50,6 @@ function CheckoutContent() {
     }
   };
 
-  // === FUNGSI SIMPAN & BERSIH-BERSIH ===
   const saveToHistory = (status: string, orderId: string, method: string) => {
     const newHistory = {
       order_id: orderId,
@@ -57,7 +64,6 @@ function CheckoutContent() {
 
     const existingData = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
 
-    // 1. Simpan Transaksi Baru
     const index = existingData.findIndex((item: any) => item.order_id === orderId);
     if (index !== -1) {
       existingData[index] = newHistory;
@@ -65,11 +71,9 @@ function CheckoutContent() {
       existingData.unshift(newHistory);
     }
 
-    // 2. LOGIKA HAPUS YANG LAMA (Jika Sukses & Ada old_id)
     if (status === 'Sukses' && old_id) {
         const oldIndex = existingData.findIndex((item: any) => item.order_id === old_id);
         if (oldIndex !== -1) {
-            // Hapus data lama yg statusnya 'Menunggu' dari array
             existingData.splice(oldIndex, 1);
         }
     }
@@ -81,7 +85,8 @@ function CheckoutContent() {
     if (!sku || !phone) return alert("Data tidak valid.");
     setLoading(true);
 
-    if (paymentMethod === 'saldo') {
+    // === OPSI 1: BAYAR PAKAI SALDO (Hanya jika BUKAN Top Up) ===
+    if (paymentMethod === 'saldo' && !isTopUp) {
         if (userSaldo < price) {
             alert("Saldo tidak cukup! Silakan Top Up atau pilih metode lain.");
             setLoading(false);
@@ -100,7 +105,6 @@ function CheckoutContent() {
             localStorage.setItem('db_users', JSON.stringify(users));
         }
 
-        // Hapus pending lama jika bayar pakai saldo juga
         saveToHistory('Sukses', `TRX-SALDO-${Date.now()}`, 'Saldo');
         
         setTimeout(() => {
@@ -109,6 +113,7 @@ function CheckoutContent() {
         }, 1000);
 
     } else {
+        // === OPSI 2: BAYAR PAKAI MIDTRANS ===
         try {
             const res = await fetch('/api/transaction/create', {
                 method: 'POST',
@@ -125,9 +130,7 @@ function CheckoutContent() {
             window.snap.pay(data.token, {
                 onSuccess: function(result: any){
                     handleTopUpSuccess(price);
-                    // Saat Sukses, fungsi ini akan otomatis menghapus ID lama (old_id)
                     saveToHistory('Sukses', data.order_id, 'Midtrans');
-                    
                     alert("Pembayaran Berhasil!");
                     router.push('/riwayat');
                 },
@@ -184,25 +187,27 @@ function CheckoutContent() {
         <p className="text-sm font-bold text-gray-700 mb-3">Metode Pembayaran</p>
         <div className="space-y-3">
             
-            {/* Opsi 1: Saldo */}
-            <div 
-                onClick={() => setPaymentMethod('saldo')}
-                className={`p-4 rounded-xl border-2 cursor-pointer flex justify-between items-center transition-all
-                ${paymentMethod === 'saldo' ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
-            >
-                <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-full text-blue-600"><Wallet size={20} /></div>
-                    <div>
-                        <p className="font-bold text-sm text-gray-800">Saldo Akun</p>
-                        <p className="text-xs text-gray-500">Sisa: Rp {userSaldo.toLocaleString('id-ID')}</p>
+            {/* Opsi 1: Saldo (DISEMBUNYIKAN JIKA TOP UP) */}
+            {!isTopUp && (
+                <div 
+                    onClick={() => setPaymentMethod('saldo')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer flex justify-between items-center transition-all
+                    ${paymentMethod === 'saldo' ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-full text-blue-600"><Wallet size={20} /></div>
+                        <div>
+                            <p className="font-bold text-sm text-gray-800">Saldo Akun</p>
+                            <p className="text-xs text-gray-500">Sisa: Rp {userSaldo.toLocaleString('id-ID')}</p>
+                        </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'saldo' ? 'border-blue-600' : 'border-gray-300'}`}>
+                        {paymentMethod === 'saldo' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
                     </div>
                 </div>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'saldo' ? 'border-blue-600' : 'border-gray-300'}`}>
-                    {paymentMethod === 'saldo' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
-                </div>
-            </div>
+            )}
 
-            {/* Opsi 2: Midtrans */}
+            {/* Opsi 2: Midtrans (Selalu Ada) */}
             <div 
                 onClick={() => setPaymentMethod('midtrans')}
                 className={`p-4 rounded-xl border-2 cursor-pointer flex justify-between items-center transition-all
@@ -222,8 +227,8 @@ function CheckoutContent() {
 
         </div>
 
-        {/* Warning kalau saldo kurang */}
-        {paymentMethod === 'saldo' && userSaldo < price && (
+        {/* Warning kalau saldo kurang (Cuma muncul kalau BUKAN Topup) */}
+        {!isTopUp && paymentMethod === 'saldo' && userSaldo < price && (
              <div className="mt-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg flex gap-2 items-center font-medium">
                 <ShieldCheck size={16} /> Saldo tidak cukup. Silakan pilih QRIS atau Top Up dulu.
              </div>
@@ -235,7 +240,7 @@ function CheckoutContent() {
       <div className="p-6 bg-white border-t border-gray-100 sticky bottom-0 z-40">
         <button 
             onClick={handleProcess}
-            disabled={loading || (paymentMethod === 'saldo' && userSaldo < price)}
+            disabled={loading || (!isTopUp && paymentMethod === 'saldo' && userSaldo < price)}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
             {loading ? "Memproses..." : `Bayar Rp ${price.toLocaleString('id-ID')}`}
