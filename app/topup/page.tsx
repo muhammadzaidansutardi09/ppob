@@ -18,7 +18,35 @@ export default function TopupPage() {
     setCurrentSaldo(session.saldo || 0);
   }, []);
 
-  // FUNGSI PROSES TOPUP (SETELAH BAYAR SUKSES)
+  // === FUNGSI HELPER SIMPAN RIWAYAT PINTAR ===
+  // Fungsi ini dipanggil saat Pending (Menunggu) dan saat Sukses
+  const saveHistory = (status: string, orderId: string) => {
+    const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
+    
+    const newHistory = {
+        order_id: orderId,
+        product_name: 'Isi Saldo',
+        price: amount,
+        phone: session.phone || '-',
+        status: status,
+        date: new Date().toLocaleString('id-ID'),
+        method: 'Midtrans' // Topup selalu via Midtrans
+    };
+
+    const history = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
+    
+    // Cek apakah order ini sudah ada? (Misal status 'Menunggu')
+    const index = history.findIndex((item: any) => item.order_id === orderId);
+    
+    if (index !== -1) {
+        history[index] = newHistory; // Update statusnya
+    } else {
+        history.unshift(newHistory); // Tambah baru
+    }
+
+    localStorage.setItem('riwayat_transaksi', JSON.stringify(history));
+  };
+
   const processSuccessTopUp = (orderId: string) => {
     // 1. Ambil Data Session
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
@@ -39,17 +67,8 @@ export default function TopupPage() {
       localStorage.setItem('db_users', JSON.stringify(users));
     }
 
-    // 5. Simpan Riwayat
-    const history = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
-    const newHistory = {
-        order_id: orderId,
-        product_name: 'Isi Saldo',
-        price: amount,
-        phone: session.phone,
-        status: 'Sukses',
-        date: new Date().toLocaleString('id-ID'),
-    };
-    localStorage.setItem('riwayat_transaksi', JSON.stringify([newHistory, ...history]));
+    // 5. UPDATE RIWAYAT JADI SUKSES (Timpa 'Menunggu')
+    saveHistory('Sukses', orderId);
 
     alert(`Top Up Berhasil! Saldo bertambah Rp ${amount.toLocaleString('id-ID')}`);
     router.push('/');
@@ -63,7 +82,6 @@ export default function TopupPage() {
     setLoading(true);
 
     try {
-        // 1. Minta Token ke Backend
         const res = await fetch('/api/transaction/create', {
             method: 'POST',
             body: JSON.stringify({
@@ -75,18 +93,20 @@ export default function TopupPage() {
         });
         const data = await res.json();
         
-        // 2. Munculkan Midtrans
         // @ts-ignore
         window.snap.pay(data.token, {
             onSuccess: function(result: any){
-                // HANYA TAMBAH SALDO JIKA SUKSES BAYAR
                 processSuccessTopUp(data.order_id);
             },
             onPending: function(result: any){
+                // SIMPAN STATUS MENUNGGU
+                saveHistory('Menunggu', data.order_id);
+                
                 alert("Menunggu Pembayaran Top Up...");
                 router.push('/riwayat');
             },
             onError: function(result: any){
+                saveHistory('Gagal', data.order_id);
                 alert("Top Up Gagal!");
             },
             onClose: function(){
@@ -105,7 +125,6 @@ export default function TopupPage() {
 
   return (
     <>
-    {/* Script Midtrans Wajib */}
     <Script 
         src="https://app.sandbox.midtrans.com/snap/snap.js"
         data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} 
