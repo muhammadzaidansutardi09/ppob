@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  order_id        String   @unique
+  customer_no     String
+  sku_code        String
+  product_name    String?
+  price_cost      Int
+  price_sell      Int
+  payment_status  String   @default("PENDING")
+  payment_method  String?
+  delivery_status String   @default("WAITING")
+  sn              String?
+  api_response    Json?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("transactions")
+}
