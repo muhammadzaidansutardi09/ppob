@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Clock, CheckCircle2, XCircle, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Import Router
+import { useRouter } from 'next/navigation';
 
 export default function RiwayatPage() {
-  const router = useRouter(); // Init Router
+  const router = useRouter();
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -23,14 +23,14 @@ export default function RiwayatPage() {
     }
   };
 
-  // FUNGSI LANJUTKAN PEMBAYARAN
+  // === PERBAIKAN DI SINI (KIRIM ID LAMA) ===
   const handleRetry = (item: any) => {
-    // Redirect ke Checkout dengan data lama
     const params = new URLSearchParams({
         name: item.product_name,
         price: item.price,
         phone: item.phone,
-        sku: item.sku || 'RETRY' // Fallback jika sku tidak tersimpan
+        sku: item.sku || 'RETRY',
+        old_id: item.order_id // <--- INI KUNCINYA: Kirim ID lama biar bisa dihapus nanti
     });
     router.push(`/checkout?${params.toString()}`);
   };
@@ -74,7 +74,6 @@ export default function RiwayatPage() {
             history.map((item, i) => (
               <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3 transition hover:shadow-md relative overflow-hidden">
                 
-                {/* Baris 1: ID & Status */}
                 <div className="flex justify-between items-start">
                    <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order ID</span>
@@ -86,7 +85,6 @@ export default function RiwayatPage() {
                    </span>
                 </div>
 
-                {/* Baris 2: Produk & Harga */}
                 <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-100">
                    <div>
                       <h3 className="font-bold text-gray-800 text-sm">{item.product_name}</h3>
@@ -97,13 +95,12 @@ export default function RiwayatPage() {
                    </p>
                 </div>
 
-                {/* Baris 3: Tanggal & Action Button */}
                 <div className="flex justify-between items-center mt-1">
                     <span className="text-[10px] text-gray-400">
                         {item.date}
                     </span>
                     
-                    {/* TOMBOL BAYAR (Hanya Muncul Jika Status Menunggu) */}
+                    {/* HANYA MUNCUL JIKA MENUNGGU */}
                     {(item.status === 'Menunggu' || item.status === 'Pending') && (
                         <button 
                             onClick={() => handleRetry(item)}
