@@ -6,6 +6,7 @@ import {
   Wallet, ShieldPlus, MoreHorizontal, Bell, 
   Plus, History, User, Home as HomeIcon, ChevronRight, ScanLine, ArrowUpRight 
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function HomePage() {
   const [saldo, setSaldo] = useState<number | null>(null);
@@ -108,21 +109,26 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* === GRID MENU === */}
-        <div className="mt-8 px-6">
-          <div className="grid grid-cols-4 gap-x-2 gap-y-6">
-            {menus.map((menu, i) => (
-              <button key={i} className="flex flex-col items-center group w-full active:scale-95 transition-transform">
-                <div className={`${menu.color} w-[58px] h-[58px] rounded-[22px] flex items-center justify-center mb-2 shadow-sm border border-gray-50 group-hover:shadow-md transition-all`}>
-                  <menu.icon size={26} strokeWidth={2} />
-                </div>
-                <span className="text-[11px] font-medium text-gray-600 text-center leading-tight">
-                  {menu.name}
-                </span>
-              </button>
-            ))}
-          </div>
+       {/* GRID MENU */}
+<div className="mt-8 px-6">
+  <div className="grid grid-cols-4 gap-x-2 gap-y-6">
+    {menus.map((menu, i) => (
+      // Tambahkan Logika Link Khusus Pulsa
+      <Link 
+        key={i} 
+        href={menu.name === 'Pulsa' ? '/pulsa' : '#'} // Kalau Pulsa ke /pulsa, lainnya diam dulu
+        className="flex flex-col items-center group w-full active:scale-95 transition-transform"
+      >
+        <div className={`${menu.color} w-[58px] h-[58px] rounded-[22px] flex items-center justify-center mb-2 shadow-sm border border-gray-50 group-hover:shadow-md transition-all`}>
+          <menu.icon size={26} strokeWidth={2} />
         </div>
+        <span className="text-[11px] font-medium text-gray-600 text-center leading-tight">
+          {menu.name}
+        </span>
+      </Link>
+    ))}
+  </div>
+</div>
 
         {/* === PROMO SPESIAL === */}
         <div className="mt-10 px-6">
