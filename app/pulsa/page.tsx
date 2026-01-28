@@ -3,24 +3,26 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Contact, Search, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
-
-// Helper: Deteksi Provider dari Prefix Nomor HP
-const detectProvider = (prefix: string) => {
-  if (/^08(11|12|13|21|22|52|53|23)/.test(prefix)) return "TELKOMSEL";
-  if (/^08(14|15|16|55|56|57|58)/.test(prefix)) return "INDOSAT";
-  if (/^08(17|18|19|59|77|78|31|32|33|38)/.test(prefix)) return "XL";
-  if (/^08(95|96|97|98|99)/.test(prefix)) return "TRI";
-  if (/^08(81|82|83|84|85|86|87|88|89)/.test(prefix)) return "SMARTFREN";
-  return null;
-};
+import { useRouter } from 'next/navigation';
 
 export default function PulsaPage() {
+  const router = useRouter(); // Inisialisasi router
   const [phoneNumber, setPhoneNumber] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ambil data produk saat halaman dibuka
+  // Helper: Deteksi Provider
+  const detectProvider = (prefix: string) => {
+    if (/^08(11|12|13|21|22|52|53|23)/.test(prefix)) return "TELKOMSEL";
+    if (/^08(14|15|16|55|56|57|58)/.test(prefix)) return "INDOSAT";
+    if (/^08(17|18|19|59|77|78|31|32|33|38)/.test(prefix)) return "XL";
+    if (/^08(95|96|97|98|99)/.test(prefix)) return "TRI";
+    if (/^08(81|82|83|84|85|86|87|88|89)/.test(prefix)) return "SMARTFREN";
+    return null;
+  };
+
+  // Ambil data produk
   useEffect(() => {
     fetch('/api/digiflazz/products', { method: 'POST' })
       .then(res => res.json())
@@ -30,24 +32,29 @@ export default function PulsaPage() {
       });
   }, []);
 
-  // Handle Input Nomor HP
+  // Handle Input
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9]/g, ''); // Hanya angka
+    const value = e.target.value.replace(/[^0-9]/g, '');
     setPhoneNumber(value);
 
-    // Deteksi provider jika panjang nomor >= 4
     if (value.length >= 4) {
-      const detected = detectProvider(value);
-      setProvider(detected);
+      setProvider(detectProvider(value));
     } else {
       setProvider(null);
     }
   };
 
-  // Filter produk berdasarkan provider yang terdeteksi
+  // Filter produk
   const filteredProducts = products.filter(p => 
     provider ? p.brand.toUpperCase() === provider : true
   );
+
+  // Fungsi Pindah ke Checkout
+  const handleSelectProduct = (product: any) => {
+    // Kita oper data lewat URL Query Params
+    const url = `/checkout?sku=${product.buyer_sku_code}&name=${encodeURIComponent(product.product_name)}&price=${product.price_sell}&phone=${phoneNumber}`;
+    router.push(url);
+  };
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
@@ -72,7 +79,6 @@ export default function PulsaPage() {
               onChange={handleInput}
               className="w-full text-xl font-bold border-b-2 border-gray-200 py-2 pr-10 focus:outline-none focus:border-blue-600 transition-colors bg-transparent placeholder:font-normal placeholder:text-gray-300"
             />
-            {/* Icon Contact / Logo Provider */}
             <div className="absolute right-0 bottom-2">
               {provider ? (
                 <span className="text-xs font-bold bg-blue-100 text-blue-600 px-2 py-1 rounded-md">
@@ -88,7 +94,6 @@ export default function PulsaPage() {
         {/* LIST PRODUK */}
         <div className="p-4 bg-gray-50 min-h-[500px]">
           {loading ? (
-             // SKELETON LOADING (Biar keren pas nunggu)
              <div className="space-y-3">
                {[1,2,3,4].map(i => (
                  <div key={i} className="h-20 bg-gray-200 rounded-xl animate-pulse"></div>
@@ -96,7 +101,6 @@ export default function PulsaPage() {
              </div>
           ) : (
             <div className="space-y-3">
-              {/* Tampilkan pesan jika nomor belum diisi */}
               {!provider && phoneNumber.length < 4 && (
                  <div className="text-center py-10 text-gray-400">
                     <Search className="mx-auto mb-2 opacity-50" size={40} />
@@ -104,20 +108,20 @@ export default function PulsaPage() {
                  </div>
               )}
 
-              {/* Tampilkan Produk */}
               {provider && filteredProducts.map((product, i) => (
                 <div 
                   key={i} 
-                  onClick={() => alert(`Beli ${product.product_name} seharga Rp ${product.price}`)}
-                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300"
+                  onClick={() => handleSelectProduct(product)} // <--- AKSI PINDAH HALAMAN
+                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group"
                 >
                   <div>
-                    <h3 className="font-bold text-gray-800">{product.product_name}</h3>
+                    <h3 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{product.product_name}</h3>
                     <p className="text-xs text-gray-400 mt-1 line-clamp-1">{product.desc || "Pulsa Reguler"}</p>
                   </div>
                   <div className="text-right">
+                    {/* Tampilkan Harga Jual (Markup), fallback ke harga asli jika undefined */}
                     <span className="block text-blue-600 font-bold text-lg">
-                      Rp {product.price.toLocaleString('id-ID')}
+                      Rp {(product.price_sell || product.price).toLocaleString('id-ID')}
                     </span>
                     {product.buyer_product_status && (
                        <span className="text-[10px] text-green-500 flex items-center justify-end gap-1">
@@ -130,13 +134,12 @@ export default function PulsaPage() {
               
               {provider && filteredProducts.length === 0 && (
                 <div className="text-center py-10 text-gray-400">
-                  <p>Produk tidak ditemukan untuk provider ini.</p>
+                  <p>Produk tidak ditemukan.</p>
                 </div>
               )}
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
