@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Clock, CheckCircle2, XCircle, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, XCircle, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Import Router
 
 export default function RiwayatPage() {
+  const router = useRouter(); // Init Router
   const [history, setHistory] = useState<any[]>([]);
 
-  // Ambil data dari LocalStorage saat halaman dibuka
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const data = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
@@ -15,7 +16,6 @@ export default function RiwayatPage() {
     }
   }, []);
 
-  // Fitur Tambahan: Hapus Riwayat (Opsional, biar user bisa bersih-bersih)
   const clearHistory = () => {
     if (confirm("Hapus semua riwayat transaksi?")) {
       localStorage.removeItem('riwayat_transaksi');
@@ -23,20 +23,29 @@ export default function RiwayatPage() {
     }
   };
 
-  // Helper Warna Status
+  // FUNGSI LANJUTKAN PEMBAYARAN
+  const handleRetry = (item: any) => {
+    // Redirect ke Checkout dengan data lama
+    const params = new URLSearchParams({
+        name: item.product_name,
+        price: item.price,
+        phone: item.phone,
+        sku: item.sku || 'RETRY' // Fallback jika sku tidak tersimpan
+    });
+    router.push(`/checkout?${params.toString()}`);
+  };
+
   const getStatusColor = (status: string) => {
-    // Normalisasi string agar tidak case-sensitive
     const s = status ? status.toLowerCase() : '';
     if (s.includes('sukses') || s.includes('success')) return 'bg-green-100 text-green-700 border-green-200';
     if (s.includes('gagal') || s.includes('fail')) return 'bg-red-100 text-red-700 border-red-200';
-    return 'bg-orange-100 text-orange-700 border-orange-200'; // Default Pending
+    return 'bg-orange-100 text-orange-700 border-orange-200'; 
   };
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
       <div className="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl flex flex-col">
         
-        {/* Header */}
         <div className="bg-white p-4 flex items-center justify-between sticky top-0 z-50 border-b border-gray-100">
           <div className="flex items-center gap-4">
             <Link href="/" className="p-2 hover:bg-gray-100 rounded-full transition">
@@ -51,7 +60,6 @@ export default function RiwayatPage() {
           )}
         </div>
 
-        {/* List Content */}
         <div className="p-4 space-y-4 flex-1 bg-gray-50 pb-20">
           
           {history.length === 0 ? (
@@ -64,7 +72,7 @@ export default function RiwayatPage() {
             </div>
           ) : (
             history.map((item, i) => (
-              <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3 transition hover:shadow-md">
+              <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3 transition hover:shadow-md relative overflow-hidden">
                 
                 {/* Baris 1: ID & Status */}
                 <div className="flex justify-between items-start">
@@ -89,11 +97,21 @@ export default function RiwayatPage() {
                    </p>
                 </div>
 
-                {/* Baris 3: Tanggal */}
-                <div className="flex justify-end">
+                {/* Baris 3: Tanggal & Action Button */}
+                <div className="flex justify-between items-center mt-1">
                     <span className="text-[10px] text-gray-400">
                         {item.date}
                     </span>
+                    
+                    {/* TOMBOL BAYAR (Hanya Muncul Jika Status Menunggu) */}
+                    {(item.status === 'Menunggu' || item.status === 'Pending') && (
+                        <button 
+                            onClick={() => handleRetry(item)}
+                            className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 transition shadow-blue-200 shadow-md"
+                        >
+                            Bayar Sekarang <ArrowRight size={12} />
+                        </button>
+                    )}
                 </div>
 
               </div>
