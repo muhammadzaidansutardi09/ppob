@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function PulsaPage() {
-  const router = useRouter(); // Inisialisasi router
+  const router = useRouter(); 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -22,21 +22,22 @@ export default function PulsaPage() {
     return null;
   };
 
-  // Ambil data produk
   useEffect(() => {
     fetch('/api/digiflazz/products', { method: 'POST' })
       .then(res => res.json())
       .then(res => {
         setProducts(res.data || []);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error("Gagal load produk:", err);
+        setLoading(false);
       });
   }, []);
 
-  // Handle Input
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     setPhoneNumber(value);
-
     if (value.length >= 4) {
       setProvider(detectProvider(value));
     } else {
@@ -44,16 +45,32 @@ export default function PulsaPage() {
     }
   };
 
-  // Filter produk
   const filteredProducts = products.filter(p => 
     provider ? p.brand.toUpperCase() === provider : true
   );
 
-  // Fungsi Pindah ke Checkout
+  // === FUNGSI CLICK (PERBAIKAN) ===
   const handleSelectProduct = (product: any) => {
-    // Kita oper data lewat URL Query Params
-    const url = `/checkout?sku=${product.buyer_sku_code}&name=${encodeURIComponent(product.product_name)}&price=${product.price_sell}&phone=${phoneNumber}`;
-    router.push(url);
+    console.log("Produk diklik:", product); // Cek di Console Browser
+
+    if (!phoneNumber || phoneNumber.length < 10) {
+      alert("Mohon masukkan nomor HP yang valid terlebih dahulu.");
+      return;
+    }
+
+    // Pastikan harga ada, kalau undefined pakai 0
+    const finalPrice = product.price_sell || product.price || 0;
+    
+    // Construct URL dengan aman
+    const params = new URLSearchParams({
+      sku: product.buyer_sku_code || "",
+      name: product.product_name || "Produk PPOB",
+      price: finalPrice.toString(),
+      phone: phoneNumber
+    });
+
+    // Redirect
+    router.push(`/checkout?${params.toString()}`);
   };
 
   return (
@@ -108,24 +125,26 @@ export default function PulsaPage() {
                  </div>
               )}
 
+              {/* LIST ITEM */}
               {provider && filteredProducts.map((product, i) => (
                 <div 
                   key={i} 
-                  onClick={() => handleSelectProduct(product)} // <--- AKSI PINDAH HALAMAN
-                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group"
+                  // Tambahkan cursor-pointer agar terlihat bisa diklik
+                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group select-none"
+                  // Pastikan onClick ada di div terluar
+                  onClick={() => handleSelectProduct(product)}
                 >
                   <div>
                     <h3 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{product.product_name}</h3>
                     <p className="text-xs text-gray-400 mt-1 line-clamp-1">{product.desc || "Pulsa Reguler"}</p>
                   </div>
                   <div className="text-right">
-                    {/* Tampilkan Harga Jual (Markup), fallback ke harga asli jika undefined */}
                     <span className="block text-blue-600 font-bold text-lg">
-                      Rp {(product.price_sell || product.price).toLocaleString('id-ID')}
+                      Rp {(product.price_sell || product.price || 0).toLocaleString('id-ID')}
                     </span>
-                    {product.buyer_product_status && (
-                       <span className="text-[10px] text-green-500 flex items-center justify-end gap-1">
-                         <CheckCircle2 size={10} /> Tersedia
+                    {product.brand && (
+                       <span className="text-[10px] text-gray-400 flex items-center justify-end gap-1">
+                         {product.brand}
                        </span>
                     )}
                   </div>
