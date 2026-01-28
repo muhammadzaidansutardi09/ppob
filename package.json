@@ -1,17 +1,21 @@
 {
-  "name": "nextjs",
+  "name": "nextjs-ppob",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
+    "@prisma/client": "latest",
+    "axios": "latest",
+    "midtrans-client": "latest",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "crypto": "latest"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,6 +24,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prisma": "latest",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
