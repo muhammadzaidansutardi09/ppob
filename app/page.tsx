@@ -6,7 +6,7 @@ import {
   Wallet, ShieldPlus, MoreHorizontal, Bell, 
   Plus, History, User, Home as HomeIcon, ChevronRight, ScanLine, ArrowUpRight 
 } from 'lucide-react';
-import Link from 'next/link';
+import Link from 'next/link'; // Wajib import Link
 
 export default function HomePage() {
   const [saldo, setSaldo] = useState<number | null>(null);
@@ -19,9 +19,6 @@ export default function HomePage() {
       const res = await fetch('/api/user/balance', { method: 'POST' });
       const result = await res.json();
       
-      // Debugging: Cek response
-      console.log("Response Digiflazz:", result);
-
       if (result.data && typeof result.data.deposit !== 'undefined') {
         setSaldo(parseInt(result.data.deposit));
       } else {
@@ -101,34 +98,37 @@ export default function HomePage() {
                 <button className="flex-1 bg-white/20 backdrop-blur-sm border border-white/20 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold active:scale-95 transition hover:bg-white/30">
                   <Plus size={16} strokeWidth={3} /> Top Up
                 </button>
-                <button className="flex-1 bg-white/20 backdrop-blur-sm border border-white/20 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold active:scale-95 transition hover:bg-white/30">
-                  <History size={16} strokeWidth={3} /> Riwayat
-                </button>
+                {/* Tombol Riwayat di Card (Juga Diaktifkan) */}
+                <Link href="/riwayat" className="flex-1">
+                    <button className="w-full bg-white/20 backdrop-blur-sm border border-white/20 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold active:scale-95 transition hover:bg-white/30">
+                    <History size={16} strokeWidth={3} /> Riwayat
+                    </button>
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-       {/* GRID MENU */}
-<div className="mt-8 px-6">
-  <div className="grid grid-cols-4 gap-x-2 gap-y-6">
-    {menus.map((menu, i) => (
-      // Tambahkan Logika Link Khusus Pulsa
-      <Link 
-        key={i} 
-        href={menu.name === 'Pulsa' ? '/pulsa' : '#'} // Kalau Pulsa ke /pulsa, lainnya diam dulu
-        className="flex flex-col items-center group w-full active:scale-95 transition-transform"
-      >
-        <div className={`${menu.color} w-[58px] h-[58px] rounded-[22px] flex items-center justify-center mb-2 shadow-sm border border-gray-50 group-hover:shadow-md transition-all`}>
-          <menu.icon size={26} strokeWidth={2} />
+        {/* === GRID MENU === */}
+        <div className="mt-8 px-6">
+          <div className="grid grid-cols-4 gap-x-2 gap-y-6">
+            {menus.map((menu, i) => (
+              <Link 
+                key={i} 
+                href={menu.name === 'Pulsa' ? '/pulsa' : '#'} // Link Pulsa Aktif, Lainnya Pagar (#)
+                className="flex flex-col items-center group w-full active:scale-95 transition-transform"
+                onClick={() => { if(menu.name !== 'Pulsa') alert('Fitur segera hadir!'); }}
+              >
+                <div className={`${menu.color} w-[58px] h-[58px] rounded-[22px] flex items-center justify-center mb-2 shadow-sm border border-gray-50 group-hover:shadow-md transition-all`}>
+                  <menu.icon size={26} strokeWidth={2} />
+                </div>
+                <span className="text-[11px] font-medium text-gray-600 text-center leading-tight">
+                  {menu.name}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-        <span className="text-[11px] font-medium text-gray-600 text-center leading-tight">
-          {menu.name}
-        </span>
-      </Link>
-    ))}
-  </div>
-</div>
 
         {/* === PROMO SPESIAL === */}
         <div className="mt-10 px-6">
@@ -142,7 +142,6 @@ export default function HomePage() {
             </button>
           </div>
           
-          {/* Scrollable Banner */}
           <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
             <div className="min-w-[280px] h-36 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-[28px] p-5 text-white relative overflow-hidden shadow-lg snap-center">
               <div className="relative z-10 w-3/4">
@@ -163,26 +162,40 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* === BOTTOM NAVIGATION (DOCKED/FULL WIDTH) === */}
-        {/* Container ini menempel di bawah (bottom-0) dan lebarnya full mengikuti wrapper HP */}
+        {/* === BOTTOM NAVIGATION (SEMUA TOMBOL AKTIF) === */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50">
           
-          {/* Background Putih & Shadow */}
           <div className="bg-white h-[80px] w-full rounded-t-[30px] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] border-t border-gray-100 flex justify-between items-center px-6 relative">
             
-            <NavButton icon={HomeIcon} label="Beranda" active />
-            <NavButton icon={History} label="Riwayat" />
+            {/* 1. Tombol BERANDA */}
+            <Link href="/" className="w-12 flex justify-center">
+               <NavButton icon={HomeIcon} label="Beranda" active={true} />
+            </Link>
+
+            {/* 2. Tombol RIWAYAT (AKTIF) */}
+            <Link href="/riwayat" className="w-12 flex justify-center">
+               <NavButton icon={History} label="Riwayat" />
+            </Link>
             
-            {/* SCAN QRIS Floating Button */}
-            {/* Posisi absolute agar 'nembus' ke atas, dengan border putih tebal agar terlihat menyatu */}
+            {/* 3. Tombol SCAN QRIS (Tengah) */}
             <div className="relative -top-8">
-               <button className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 transition-transform active:scale-90 border-[6px] border-white">
+               <button 
+                 onClick={() => alert("Fitur Scan QRIS akan segera hadir!")} 
+                 className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 transition-transform active:scale-90 border-[6px] border-white"
+               >
                   <ScanLine size={28} />
                </button>
             </div>
 
-            <NavButton icon={Wallet} label="Dompet" />
-            <NavButton icon={User} label="Akun" />
+            {/* 4. Tombol DOMPET (Placeholder) */}
+            <Link href="#" onClick={() => alert("Halaman Dompet belum dibuat.")} className="w-12 flex justify-center">
+               <NavButton icon={Wallet} label="Dompet" />
+            </Link>
+
+            {/* 5. Tombol AKUN (Placeholder) */}
+            <Link href="#" onClick={() => alert("Halaman Akun belum dibuat.")} className="w-12 flex justify-center">
+               <NavButton icon={User} label="Akun" />
+            </Link>
             
           </div>
         </div>
@@ -192,11 +205,12 @@ export default function HomePage() {
   );
 }
 
+// Komponen Kecil NavButton
 function NavButton({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) {
   return (
-    <button className={`flex flex-col items-center gap-1.5 w-12 ${active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'} transition-colors mt-2`}>
+    <div className={`flex flex-col items-center gap-1.5 ${active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'} transition-colors mt-2`}>
       <Icon size={24} strokeWidth={active ? 2.5 : 2} />
       <span className={`text-[10px] ${active ? 'font-bold' : 'font-medium'}`}>{label}</span>
-    </button>
+    </div>
   );
 }
