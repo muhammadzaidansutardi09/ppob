@@ -11,9 +11,9 @@ function CheckoutContent() {
   
   const product_name = searchParams.get('name') || "Produk PPOB";
   const price = parseInt(searchParams.get('price') || '0');
-  const sku = searchParams.get('sku'); // Ini akan bernilai 'TOPUP' jika dari halaman TopUp
+  const sku = searchParams.get('sku');
   const phone = searchParams.get('phone');
-  const old_id = searchParams.get('old_id');
+  const old_id = searchParams.get('old_id'); // <--- TANGKAP ID LAMA DI SINI
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'saldo' | 'midtrans'>('saldo');
@@ -24,30 +24,25 @@ function CheckoutContent() {
     setUserSaldo(session.saldo || 0);
   }, []);
 
-  // === LOGIKA TAMBAH SALDO (JIKA TOPUP SUKSES) ===
+  // Helper Tambah Saldo
   const handleTopUpSuccess = (amount: number) => {
-    // Cek apakah ini transaksi Top Up?
-    // Kita cek SKU atau Nama Produknya
     if (sku === 'TOPUP' || product_name.toLowerCase().includes('isi saldo')) {
         const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
         const newBalance = (session.saldo || 0) + amount;
 
-        // 1. Update Session di HP (Biar angka di Home berubah)
         session.saldo = newBalance;
         localStorage.setItem('ppob_session', JSON.stringify(session));
 
-        // 2. Update Database User (Biar permanen)
         const users = JSON.parse(localStorage.getItem('db_users') || '[]');
         const uIdx = users.findIndex((u: any) => u.phone === session.phone);
         if (uIdx !== -1) {
             users[uIdx].saldo = newBalance;
             localStorage.setItem('db_users', JSON.stringify(users));
         }
-        
-        // alert("Saldo berhasil ditambahkan!"); // Opsional
     }
   };
 
+  // === FUNGSI SIMPAN & BERSIH-BERSIH ===
   const saveToHistory = (status: string, orderId: string, method: string) => {
     const newHistory = {
       order_id: orderId,
@@ -62,6 +57,7 @@ function CheckoutContent() {
 
     const existingData = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
 
+    // 1. Simpan Transaksi Baru
     const index = existingData.findIndex((item: any) => item.order_id === orderId);
     if (index !== -1) {
       existingData[index] = newHistory;
@@ -69,10 +65,13 @@ function CheckoutContent() {
       existingData.unshift(newHistory);
     }
 
-    // Hapus ID Lama jika sukses (Retry)
+    // 2. LOGIKA HAPUS YANG LAMA (Jika Sukses & Ada old_id)
     if (status === 'Sukses' && old_id) {
         const oldIndex = existingData.findIndex((item: any) => item.order_id === old_id);
-        if (oldIndex !== -1) existingData.splice(oldIndex, 1);
+        if (oldIndex !== -1) {
+            // Hapus data lama yg statusnya 'Menunggu' dari array
+            existingData.splice(oldIndex, 1);
+        }
     }
 
     localStorage.setItem('riwayat_transaksi', JSON.stringify(existingData));
@@ -89,7 +88,6 @@ function CheckoutContent() {
             return;
         }
 
-        // ... (Kode potong saldo disini tetap sama) ...
         const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
         const newBalance = (session.saldo || 0) - price;
         session.saldo = newBalance;
@@ -102,14 +100,15 @@ function CheckoutContent() {
             localStorage.setItem('db_users', JSON.stringify(users));
         }
 
+        // Hapus pending lama jika bayar pakai saldo juga
         saveToHistory('Sukses', `TRX-SALDO-${Date.now()}`, 'Saldo');
+        
         setTimeout(() => {
             alert("Pembayaran Berhasil via Saldo!");
             router.push('/riwayat');
         }, 1000);
 
     } else {
-        // === PEMBAYARAN VIA MIDTRANS ===
         try {
             const res = await fetch('/api/transaction/create', {
                 method: 'POST',
@@ -125,13 +124,11 @@ function CheckoutContent() {
             // @ts-ignore
             window.snap.pay(data.token, {
                 onSuccess: function(result: any){
-                    // 1. JIKA SUKSES, CEK APAKAH INI TOPUP? KALAU YA, TAMBAH SALDO
                     handleTopUpSuccess(price);
-                    
-                    // 2. Simpan Riwayat Sukses
+                    // Saat Sukses, fungsi ini akan otomatis menghapus ID lama (old_id)
                     saveToHistory('Sukses', data.order_id, 'Midtrans');
                     
-                    alert("Pembayaran Berhasil! Saldo (jika Top Up) telah ditambahkan.");
+                    alert("Pembayaran Berhasil!");
                     router.push('/riwayat');
                 },
                 onPending: function(result: any){
