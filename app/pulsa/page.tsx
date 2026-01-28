@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function PulsaPage() {
+  // 1. PINDAHKAN useRouter KE SINI (DI DALAM FUNCTION)
   const router = useRouter(); 
+
   const [phoneNumber, setPhoneNumber] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -22,6 +24,7 @@ export default function PulsaPage() {
     return null;
   };
 
+  // Ambil data produk
   useEffect(() => {
     fetch('/api/digiflazz/products', { method: 'POST' })
       .then(res => res.json())
@@ -35,9 +38,11 @@ export default function PulsaPage() {
       });
   }, []);
 
+  // Handle Input
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     setPhoneNumber(value);
+
     if (value.length >= 4) {
       setProvider(detectProvider(value));
     } else {
@@ -49,31 +54,30 @@ export default function PulsaPage() {
     provider ? p.brand.toUpperCase() === provider : true
   );
 
-  // === FUNGSI CLICK (PERBAIKAN) ===
+  // 2. FUNGSI UNTUK PINDAH KE CHECKOUT (BUKAN ALERT)
   const handleSelectProduct = (product: any) => {
-    console.log("Produk diklik:", product); // Cek di Console Browser
-
     if (!phoneNumber || phoneNumber.length < 10) {
-      alert("Mohon masukkan nomor HP yang valid terlebih dahulu.");
+      alert("Mohon masukkan nomor HP yang valid (min 10 digit).");
       return;
     }
 
-    // Pastikan harga ada, kalau undefined pakai 0
+    // Ambil harga yang benar (prioritas harga jual)
     const finalPrice = product.price_sell || product.price || 0;
     
-    // Construct URL dengan aman
+    // Siapkan data untuk dikirim ke URL
     const params = new URLSearchParams({
-      sku: product.buyer_sku_code || "",
-      name: product.product_name || "Produk PPOB",
+      sku: product.buyer_sku_code,
+      name: product.product_name,
       price: finalPrice.toString(),
       phone: phoneNumber
     });
 
-    // Redirect
+    // Pindah halaman!
     router.push(`/checkout?${params.toString()}`);
   };
 
   return (
+    // WRAPPER UTAMA (PENTING AGAR TAMPILAN SEPERTI HP)
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
       <div className="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl">
         
@@ -125,14 +129,13 @@ export default function PulsaPage() {
                  </div>
               )}
 
-              {/* LIST ITEM */}
+              {/* ITEM PRODUK */}
               {provider && filteredProducts.map((product, i) => (
                 <div 
                   key={i} 
-                  // Tambahkan cursor-pointer agar terlihat bisa diklik
-                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group select-none"
-                  // Pastikan onClick ada di div terluar
+                  // 3. PASANG FUNGSI KLIK DISINI
                   onClick={() => handleSelectProduct(product)}
+                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group select-none"
                 >
                   <div>
                     <h3 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{product.product_name}</h3>
