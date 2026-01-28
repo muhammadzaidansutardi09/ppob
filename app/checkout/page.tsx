@@ -11,20 +11,43 @@ function CheckoutContent() {
   
   const product_name = searchParams.get('name') || "Produk PPOB";
   const price = parseInt(searchParams.get('price') || '0');
-  const sku = searchParams.get('sku');
+  const sku = searchParams.get('sku'); // Ini akan bernilai 'TOPUP' jika dari halaman TopUp
   const phone = searchParams.get('phone');
+  const old_id = searchParams.get('old_id');
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'saldo' | 'midtrans'>('saldo');
   const [userSaldo, setUserSaldo] = useState(0);
 
-  // Ambil saldo user saat ini
   useEffect(() => {
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
     setUserSaldo(session.saldo || 0);
   }, []);
 
-  // === FUNGSI SIMPAN PINTAR (UPDATE JIKA ADA, BUAT BARU JIKA TIDAK) ===
+  // === LOGIKA TAMBAH SALDO (JIKA TOPUP SUKSES) ===
+  const handleTopUpSuccess = (amount: number) => {
+    // Cek apakah ini transaksi Top Up?
+    // Kita cek SKU atau Nama Produknya
+    if (sku === 'TOPUP' || product_name.toLowerCase().includes('isi saldo')) {
+        const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
+        const newBalance = (session.saldo || 0) + amount;
+
+        // 1. Update Session di HP (Biar angka di Home berubah)
+        session.saldo = newBalance;
+        localStorage.setItem('ppob_session', JSON.stringify(session));
+
+        // 2. Update Database User (Biar permanen)
+        const users = JSON.parse(localStorage.getItem('db_users') || '[]');
+        const uIdx = users.findIndex((u: any) => u.phone === session.phone);
+        if (uIdx !== -1) {
+            users[uIdx].saldo = newBalance;
+            localStorage.setItem('db_users', JSON.stringify(users));
+        }
+        
+        // alert("Saldo berhasil ditambahkan!"); // Opsional
+    }
+  };
+
   const saveToHistory = (status: string, orderId: string, method: string) => {
     const newHistory = {
       order_id: orderId,
@@ -37,18 +60,19 @@ function CheckoutContent() {
       method: method
     };
 
-    // Ambil data lama
     const existingData = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
 
-    // Cek apakah Order ID ini sudah ada?
     const index = existingData.findIndex((item: any) => item.order_id === orderId);
-
     if (index !== -1) {
-      // JIKA ADA: UPDATE STATUSNYA (TIMPA)
       existingData[index] = newHistory;
     } else {
-      // JIKA TIDAK ADA: TAMBAH BARU DI ATAS
       existingData.unshift(newHistory);
+    }
+
+    // Hapus ID Lama jika sukses (Retry)
+    if (status === 'Sukses' && old_id) {
+        const oldIndex = existingData.findIndex((item: any) => item.order_id === old_id);
+        if (oldIndex !== -1) existingData.splice(oldIndex, 1);
     }
 
     localStorage.setItem('riwayat_transaksi', JSON.stringify(existingData));
@@ -58,7 +82,6 @@ function CheckoutContent() {
     if (!sku || !phone) return alert("Data tidak valid.");
     setLoading(true);
 
-    // === OPSI 1: BAYAR PAKAI SALDO ===
     if (paymentMethod === 'saldo') {
         if (userSaldo < price) {
             alert("Saldo tidak cukup! Silakan Top Up atau pilih metode lain.");
@@ -66,6 +89,7 @@ function CheckoutContent() {
             return;
         }
 
+        // ... (Kode potong saldo disini tetap sama) ...
         const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
         const newBalance = (session.saldo || 0) - price;
         session.saldo = newBalance;
@@ -79,15 +103,13 @@ function CheckoutContent() {
         }
 
         saveToHistory('Sukses', `TRX-SALDO-${Date.now()}`, 'Saldo');
-        
         setTimeout(() => {
             alert("Pembayaran Berhasil via Saldo!");
             router.push('/riwayat');
         }, 1000);
-    } 
-    
-    // === OPSI 2: BAYAR PAKAI MIDTRANS (QRIS/VA) ===
-    else {
+
+    } else {
+        // === PEMBAYARAN VIA MIDTRANS ===
         try {
             const res = await fetch('/api/transaction/create', {
                 method: 'POST',
@@ -103,12 +125,16 @@ function CheckoutContent() {
             // @ts-ignore
             window.snap.pay(data.token, {
                 onSuccess: function(result: any){
+                    // 1. JIKA SUKSES, CEK APAKAH INI TOPUP? KALAU YA, TAMBAH SALDO
+                    handleTopUpSuccess(price);
+                    
+                    // 2. Simpan Riwayat Sukses
                     saveToHistory('Sukses', data.order_id, 'Midtrans');
-                    alert("Pembayaran Berhasil!");
+                    
+                    alert("Pembayaran Berhasil! Saldo (jika Top Up) telah ditambahkan.");
                     router.push('/riwayat');
                 },
                 onPending: function(result: any){
-                    // Disini status "Menunggu" dibuat
                     saveToHistory('Menunggu', data.order_id, 'Midtrans');
                     alert("Menunggu Pembayaran...");
                     router.push('/riwayat');
