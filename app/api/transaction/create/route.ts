@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import Midtrans from 'midtrans-client';
 
-// Konfigurasi Midtrans
+// Gunakan Env Variable agar aman (Sesuai file .env.local yang baru dibuat)
 const snap = new Midtrans.Snap({
   isProduction: false,
-  serverKey: 'SB-Mid-server-UXjtA4DxG241QAOX5xQJsZIY', // Pastikan Server Key benar
-  clientKey: 'SB-Mid-client-0EocBOEFNi15it07'
+  serverKey: process.env.MIDTRANS_SERVER_KEY || "", 
+  clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""
 });
 
 export async function POST(req: Request) {
@@ -13,10 +13,9 @@ export async function POST(req: Request) {
     const { sku_code, product_name, customer_no, amount } = await req.json();
 
     // 1. Buat Order ID Unik
-    // Kita pakai timestamp biar unik
     const orderId = `TRX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    console.log("Meminta Token Midtrans untuk Order:", orderId);
+    
+    console.log("Memproses Order:", orderId);
 
     // 2. Siapkan Parameter Midtrans
     const parameter = {
@@ -37,11 +36,10 @@ export async function POST(req: Request) {
       }]
     };
 
-    // 3. Minta Token (Tanpa simpan ke Database)
+    // 3. Minta Token ke Midtrans
     const transaction = await snap.createTransaction(parameter);
 
-    // 4. Kirim Token & Order ID ke Frontend
-    // Nanti Frontend yang bertugas menyimpan data ke LocalStorage
+    // 4. Balikin Token ke Frontend
     return NextResponse.json({ 
       token: transaction.token,
       order_id: orderId 
