@@ -18,7 +18,7 @@ export default function HomePage() {
       const res = await fetch('/api/user/balance', { method: 'POST' });
       const result = await res.json();
       
-      // Debugging: Cek apa yang dikembalikan Digiflazz
+      // Debugging: Cek response
       console.log("Response Digiflazz:", result);
 
       if (result.data && typeof result.data.deposit !== 'undefined') {
@@ -157,17 +157,21 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* === FLOATING BOTTOM NAVIGATION (Fixed) === */}
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[440px] z-50">
-          <div className="bg-white/80 backdrop-blur-md border border-white/40 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] h-[70px] flex justify-between items-center px-6 relative">
+        {/* === BOTTOM NAVIGATION (DOCKED/FULL WIDTH) === */}
+        {/* Container ini menempel di bawah (bottom-0) dan lebarnya full mengikuti wrapper HP */}
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50">
+          
+          {/* Background Putih & Shadow */}
+          <div className="bg-white h-[80px] w-full rounded-t-[30px] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] border-t border-gray-100 flex justify-between items-center px-6 relative">
             
             <NavButton icon={HomeIcon} label="Beranda" active />
             <NavButton icon={History} label="Riwayat" />
             
             {/* SCAN QRIS Floating Button */}
-            <div className="relative -top-6">
-               <button className="bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 transition-transform active:scale-90 border-[4px] border-[#F3F4F6]">
-                  <ScanLine size={24} />
+            {/* Posisi absolute agar 'nembus' ke atas, dengan border putih tebal agar terlihat menyatu */}
+            <div className="relative -top-8">
+               <button className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 transition-transform active:scale-90 border-[6px] border-white">
+                  <ScanLine size={28} />
                </button>
             </div>
 
@@ -184,7 +188,7 @@ export default function HomePage() {
 
 function NavButton({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) {
   return (
-    <button className={`flex flex-col items-center gap-1 ${active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'} transition-colors`}>
+    <button className={`flex flex-col items-center gap-1.5 w-12 ${active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'} transition-colors mt-2`}>
       <Icon size={24} strokeWidth={active ? 2.5 : 2} />
       <span className={`text-[10px] ${active ? 'font-bold' : 'font-medium'}`}>{label}</span>
     </button>
