@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
-import Script from 'next/script'; // Import Script untuk Midtrans
+import Script from 'next/script';
 
 export default function TopupPage() {
   const router = useRouter();
@@ -12,14 +12,12 @@ export default function TopupPage() {
   const [currentSaldo, setCurrentSaldo] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Ambil saldo saat ini
   useEffect(() => {
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
     setCurrentSaldo(session.saldo || 0);
   }, []);
 
-  // === FUNGSI HELPER SIMPAN RIWAYAT PINTAR ===
-  // Fungsi ini dipanggil saat Pending (Menunggu) dan saat Sukses
+  // === FUNGSI SIMPAN RIWAYAT (DITAMBAHKAN SKU: TOPUP) ===
   const saveHistory = (status: string, orderId: string) => {
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
     
@@ -28,38 +26,34 @@ export default function TopupPage() {
         product_name: 'Isi Saldo',
         price: amount,
         phone: session.phone || '-',
+        sku: 'TOPUP', // <--- PENTING! TANDA BAHWA INI ADALAH TOPUP
         status: status,
         date: new Date().toLocaleString('id-ID'),
-        method: 'Midtrans' // Topup selalu via Midtrans
+        method: 'Midtrans'
     };
 
     const history = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
-    
-    // Cek apakah order ini sudah ada? (Misal status 'Menunggu')
     const index = history.findIndex((item: any) => item.order_id === orderId);
     
     if (index !== -1) {
-        history[index] = newHistory; // Update statusnya
+        history[index] = newHistory;
     } else {
-        history.unshift(newHistory); // Tambah baru
+        history.unshift(newHistory);
     }
 
     localStorage.setItem('riwayat_transaksi', JSON.stringify(history));
   };
 
   const processSuccessTopUp = (orderId: string) => {
-    // 1. Ambil Data Session
     const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
     if (!session.phone) return;
 
-    // 2. Tambah Saldo
+    // Tambah Saldo
     const newBalance = (session.saldo || 0) + amount;
-
-    // 3. Update Session
     session.saldo = newBalance;
     localStorage.setItem('ppob_session', JSON.stringify(session));
 
-    // 4. Update Database Users
+    // Update DB User
     const users = JSON.parse(localStorage.getItem('db_users') || '[]');
     const userIndex = users.findIndex((u: any) => u.phone === session.phone);
     if (userIndex !== -1) {
@@ -67,7 +61,7 @@ export default function TopupPage() {
       localStorage.setItem('db_users', JSON.stringify(users));
     }
 
-    // 5. UPDATE RIWAYAT JADI SUKSES (Timpa 'Menunggu')
+    // Update Riwayat jadi Sukses
     saveHistory('Sukses', orderId);
 
     alert(`Top Up Berhasil! Saldo bertambah Rp ${amount.toLocaleString('id-ID')}`);
@@ -99,9 +93,7 @@ export default function TopupPage() {
                 processSuccessTopUp(data.order_id);
             },
             onPending: function(result: any){
-                // SIMPAN STATUS MENUNGGU
                 saveHistory('Menunggu', data.order_id);
-                
                 alert("Menunggu Pembayaran Top Up...");
                 router.push('/riwayat');
             },
@@ -130,10 +122,9 @@ export default function TopupPage() {
         data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} 
         strategy="lazyOnload"
     />
-
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
       <div className="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl flex flex-col">
-        
+        {/* Header */}
         <div className="bg-white p-4 flex items-center gap-4 sticky top-0 z-50 border-b border-gray-100">
           <Link href="/" className="p-2 hover:bg-gray-100 rounded-full transition">
              <ArrowLeft size={24} className="text-gray-700" />
@@ -178,7 +169,6 @@ export default function TopupPage() {
               {loading ? "Memuat..." : (amount > 0 ? `Bayar Rp ${amount.toLocaleString('id-ID')}` : 'Pilih Nominal')}
            </button>
         </div>
-
       </div>
     </div>
     </>
