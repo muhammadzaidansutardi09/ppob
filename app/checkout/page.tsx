@@ -24,19 +24,34 @@ function CheckoutContent() {
     setUserSaldo(session.saldo || 0);
   }, []);
 
-  // Helper Simpan Riwayat
+  // === FUNGSI SIMPAN PINTAR (UPDATE JIKA ADA, BUAT BARU JIKA TIDAK) ===
   const saveToHistory = (status: string, orderId: string, method: string) => {
     const newHistory = {
       order_id: orderId,
       product_name: product_name,
       price: price,
       phone: phone,
+      sku: sku,
       status: status,
       date: new Date().toLocaleString('id-ID'),
       method: method
     };
+
+    // Ambil data lama
     const existingData = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
-    localStorage.setItem('riwayat_transaksi', JSON.stringify([newHistory, ...existingData]));
+
+    // Cek apakah Order ID ini sudah ada?
+    const index = existingData.findIndex((item: any) => item.order_id === orderId);
+
+    if (index !== -1) {
+      // JIKA ADA: UPDATE STATUSNYA (TIMPA)
+      existingData[index] = newHistory;
+    } else {
+      // JIKA TIDAK ADA: TAMBAH BARU DI ATAS
+      existingData.unshift(newHistory);
+    }
+
+    localStorage.setItem('riwayat_transaksi', JSON.stringify(existingData));
   };
 
   const handleProcess = async () => {
@@ -51,13 +66,11 @@ function CheckoutContent() {
             return;
         }
 
-        // Potong Saldo
         const session = JSON.parse(localStorage.getItem('ppob_session') || '{}');
         const newBalance = (session.saldo || 0) - price;
         session.saldo = newBalance;
         localStorage.setItem('ppob_session', JSON.stringify(session));
 
-        // Update DB User juga
         const users = JSON.parse(localStorage.getItem('db_users') || '[]');
         const uIdx = users.findIndex((u: any) => u.phone === session.phone);
         if(uIdx !== -1) {
@@ -65,7 +78,6 @@ function CheckoutContent() {
             localStorage.setItem('db_users', JSON.stringify(users));
         }
 
-        // Simpan Riwayat
         saveToHistory('Sukses', `TRX-SALDO-${Date.now()}`, 'Saldo');
         
         setTimeout(() => {
@@ -96,6 +108,7 @@ function CheckoutContent() {
                     router.push('/riwayat');
                 },
                 onPending: function(result: any){
+                    // Disini status "Menunggu" dibuat
                     saveToHistory('Menunggu', data.order_id, 'Midtrans');
                     alert("Menunggu Pembayaran...");
                     router.push('/riwayat');
