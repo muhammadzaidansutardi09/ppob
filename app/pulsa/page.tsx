@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Contact, Search, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Contact, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function PulsaPage() {
-  // 1. PINDAHKAN useRouter KE SINI (DI DALAM FUNCTION)
   const router = useRouter(); 
 
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -14,7 +13,7 @@ export default function PulsaPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Helper: Deteksi Provider
+  // Helper: Deteksi Provider Indonesia
   const detectProvider = (prefix: string) => {
     if (/^08(11|12|13|21|22|52|53|23)/.test(prefix)) return "TELKOMSEL";
     if (/^08(14|15|16|55|56|57|58)/.test(prefix)) return "INDOSAT";
@@ -24,21 +23,23 @@ export default function PulsaPage() {
     return null;
   };
 
-  // Ambil data produk
+  // Ambil data produk (Real Time saat halaman dibuka)
   useEffect(() => {
     fetch('/api/digiflazz/products', { method: 'POST' })
       .then(res => res.json())
       .then(res => {
+        // Jika data kosong atau error, set array kosong
         setProducts(res.data || []);
         setLoading(false);
       })
       .catch(err => {
         console.error("Gagal load produk:", err);
+        setProducts([]); // Pastikan kosong jika error network
         setLoading(false);
       });
   }, []);
 
-  // Handle Input
+  // Handle Input Nomor HP
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     setPhoneNumber(value);
@@ -50,21 +51,20 @@ export default function PulsaPage() {
     }
   };
 
+  // Filter Produk Sesuai Provider
   const filteredProducts = products.filter(p => 
     provider ? p.brand.toUpperCase() === provider : true
   );
 
-  // 2. FUNGSI UNTUK PINDAH KE CHECKOUT (BUKAN ALERT)
+  // Fungsi Pindah ke Checkout
   const handleSelectProduct = (product: any) => {
     if (!phoneNumber || phoneNumber.length < 10) {
       alert("Mohon masukkan nomor HP yang valid (min 10 digit).");
       return;
     }
 
-    // Ambil harga yang benar (prioritas harga jual)
     const finalPrice = product.price_sell || product.price || 0;
     
-    // Siapkan data untuk dikirim ke URL
     const params = new URLSearchParams({
       sku: product.buyer_sku_code,
       name: product.product_name,
@@ -72,12 +72,10 @@ export default function PulsaPage() {
       phone: phoneNumber
     });
 
-    // Pindah halaman!
     router.push(`/checkout?${params.toString()}`);
   };
 
   return (
-    // WRAPPER UTAMA (PENTING AGAR TAMPILAN SEPERTI HP)
     <div className="min-h-screen bg-[#F3F4F6] flex justify-center font-sans">
       <div className="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl">
         
@@ -129,11 +127,10 @@ export default function PulsaPage() {
                  </div>
               )}
 
-              {/* ITEM PRODUK */}
+              {/* TAMPILKAN PRODUK REAL */}
               {provider && filteredProducts.map((product, i) => (
                 <div 
                   key={i} 
-                  // 3. PASANG FUNGSI KLIK DISINI
                   onClick={() => handleSelectProduct(product)}
                   className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:scale-[0.98] transition cursor-pointer hover:border-blue-300 group select-none"
                 >
@@ -146,17 +143,18 @@ export default function PulsaPage() {
                       Rp {(product.price_sell || product.price || 0).toLocaleString('id-ID')}
                     </span>
                     {product.brand && (
-                       <span className="text-[10px] text-gray-400 flex items-center justify-end gap-1">
-                         {product.brand}
-                       </span>
+                        <span className="text-[10px] text-gray-400 flex items-center justify-end gap-1">
+                          {product.brand}
+                        </span>
                     )}
                   </div>
                 </div>
               ))}
               
+              {/* JIKA TIDAK ADA DATA (Empty State) */}
               {provider && filteredProducts.length === 0 && (
                 <div className="text-center py-10 text-gray-400">
-                  <p>Produk tidak ditemukan.</p>
+                  <p>Produk tidak ditemukan atau Koneksi Gagal.</p>
                 </div>
               )}
             </div>
