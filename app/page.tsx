@@ -5,7 +5,7 @@ import {
   Smartphone, Zap, Wifi, Gamepad2, CreditCard, 
   Wallet, ShieldPlus, MoreHorizontal, Bell, 
   Plus, History, User, Home as HomeIcon, ScanLine, ArrowUpRight,
-  Eye, EyeOff, LogOut, X, CheckCircle2, Clock, AlertCircle, ShoppingBag
+  Eye, EyeOff, LogOut, X, CheckCircle2, Clock, AlertCircle, ShoppingBag, Server
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,20 +13,21 @@ import { useRouter } from 'next/navigation';
 export default function HomePage() {
   const router = useRouter();
   
-  // === STATE USER ===
+  // === STATE USER & APP ===
   const [user, setUser] = useState<any>({ name: 'Loading...', saldo: 0 });
+  const [serverBalance, setServerBalance] = useState<number | null>(null); // State Saldo Digiflazz
   const [loading, setLoading] = useState(true);
   
   // === STATE NOTIFIKASI ===
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null); // Untuk klik di luar dropdown
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // === STATE TOGGLE SALDO ===
   const [showSaldo, setShowSaldo] = useState(true);
 
-  // === 1. LOAD DATA & NOTIFIKASI ===
+  // === 1. LOAD DATA ===
   useEffect(() => {
     // A. Cek Session User
     const session = localStorage.getItem('ppob_session');
@@ -37,15 +38,21 @@ export default function HomePage() {
       setLoading(false);
     }
 
-    // B. Load Notifikasi dari Riwayat
+    // B. Load Notifikasi
     const riwayat = JSON.parse(localStorage.getItem('riwayat_transaksi') || '[]');
     setNotifications(riwayat);
-
-    // Hitung berapa yang belum dibaca (is_read === undefined atau false)
     const unread = riwayat.filter((item: any) => !item.is_read).length;
     setUnreadCount(unread);
 
-    // Event Listener untuk klik di luar dropdown (biar nutup sendiri)
+    // C. LOAD SALDO DIGIFLAZZ (SERVER)
+    fetch('/api/digiflazz/balance', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+         if(data.status === 'ok') setServerBalance(data.balance);
+      })
+      .catch(err => console.error("Gagal load saldo server"));
+
+    // Event Listener Dropdown
     function handleClickOutside(event: any) {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setShowNotifDropdown(false);
@@ -55,21 +62,16 @@ export default function HomePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // === 2. HANDLE BUKA NOTIFIKASI (MARK AS READ) ===
   const toggleNotif = () => {
     if (!showNotifDropdown) {
-      // Jika mau dibuka: Tandai semua sudah dibaca
       const updatedNotif = notifications.map(n => ({ ...n, is_read: true }));
       setNotifications(updatedNotif);
-      setUnreadCount(0); // Reset badge jadi 0
-      
-      // Simpan status "sudah dibaca" ke LocalStorage
+      setUnreadCount(0);
       localStorage.setItem('riwayat_transaksi', JSON.stringify(updatedNotif));
     }
     setShowNotifDropdown(!showNotifDropdown);
   };
 
-  // === 3. FUNGSI LOGOUT ===
   const handleLogout = () => {
     if (confirm("Yakin ingin keluar akun?")) {
       localStorage.removeItem('ppob_session');
@@ -96,7 +98,7 @@ export default function HomePage() {
       <div className="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl overflow-hidden pb-32">
         
         {/* === HEADER SECTION === */}
-        <div className="px-6 pt-12 pb-6 bg-white flex justify-between items-center sticky top-0 z-30">
+        <div className="px-6 pt-12 pb-6 bg-white flex justify-between items-start sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200 overflow-hidden">
                <User size={20} className="text-blue-600" />
@@ -106,17 +108,26 @@ export default function HomePage() {
               <h1 className="text-gray-800 font-bold text-lg leading-tight capitalize">
                 {user.name}
               </h1>
+              
+              {/* === INDIKATOR SALDO DIGIFLAZZ (ADMIN INFO) === */}
+              {serverBalance !== null && (
+                 <div className="flex items-center gap-1 mt-1 bg-gray-100 px-2 py-0.5 rounded-md w-fit">
+                    <Server size={10} className="text-gray-400" />
+                    <span className="text-[10px] text-gray-500 font-mono">
+                       Server: Rp {serverBalance.toLocaleString('id-ID')}
+                    </span>
+                 </div>
+              )}
             </div>
           </div>
 
-          {/* === BUTTON NOTIFIKASI DENGAN DROPDOWN === */}
+          {/* === NOTIFIKASI === */}
           <div className="relative" ref={notifRef}>
             <button 
               onClick={toggleNotif}
               className={`relative p-2 rounded-full transition ${showNotifDropdown ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-gray-700'}`}
             >
               <Bell size={24} />
-              {/* Badge Merah (Hanya muncul jika unreadCount > 0) */}
               {unreadCount > 0 && (
                 <div className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full border-2 border-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -124,7 +135,7 @@ export default function HomePage() {
               )}
             </button>
 
-            {/* === DROPDOWN PANEL NOTIFIKASI === */}
+            {/* Dropdown Notif */}
             {showNotifDropdown && (
               <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -141,16 +152,14 @@ export default function HomePage() {
                       <p className="text-xs">Belum ada notifikasi</p>
                     </div>
                   ) : (
-                    notifications.slice(0, 10).map((item, i) => ( // Tampilkan max 10 terakhir
+                    notifications.slice(0, 10).map((item, i) => (
                       <div key={i} className="p-3 rounded-xl hover:bg-gray-50 transition border border-gray-50 flex gap-3 items-start">
-                        {/* Icon Status */}
                         <div className={`mt-0.5 p-1.5 rounded-full shrink-0
                           ${item.status === 'Sukses' ? 'bg-green-100 text-green-600' : 
                             item.status === 'Gagal' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
                            {item.status === 'Sukses' ? <CheckCircle2 size={12} /> : 
                             item.status === 'Gagal' ? <AlertCircle size={12} /> : <Clock size={12} />}
                         </div>
-                        
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-gray-800 truncate">
                             Transaksi {item.status}
